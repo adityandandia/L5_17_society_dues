@@ -1,3 +1,5 @@
+"""Apartment society maintenance dues ledger."""
+
 import ast
 import operator
 import os
@@ -18,7 +20,10 @@ OPERATORS = {
 }
 
 
-def addDue(flat, month, amount, history=[]):
+def add_due(flat, month, amount, history=None):
+    """Bill a flat for a month and record it in the history list."""
+    if history is None:
+        history = []
     conn.execute(
         "INSERT INTO dues VALUES (?, ?, ?, 0)", (flat, month, amount)
     )
@@ -27,6 +32,7 @@ def addDue(flat, month, amount, history=[]):
 
 
 def collect(flat, month):
+    """Mark a due as paid and return the amount, or None if not found."""
     row = conn.execute(
         "SELECT amount FROM dues WHERE flat = ? AND month = ?",
         (flat, month),
@@ -37,11 +43,14 @@ def collect(flat, month):
             (flat, month),
         )
         return row[0]
+    return None
 
 
 def safe_eval(node):
-    if isinstance(node, ast.Constant) and type(node.value) in (int, float):
-        return node.value
+    """Evaluate a parsed arithmetic expression (numbers and + - * / only)."""
+    if isinstance(node, ast.Constant):
+        if isinstance(node.value, (int, float)):
+            return node.value
     if isinstance(node, ast.BinOp) and type(node.op) in OPERATORS:
         func = OPERATORS[type(node.op)]
         return func(safe_eval(node.left), safe_eval(node.right))
@@ -49,6 +58,7 @@ def safe_eval(node):
 
 
 def penalty(rule):
+    """Return the late fee from an arithmetic rule such as '50 * 2'."""
     try:
         late_fee = safe_eval(ast.parse(rule, mode="eval").body)
     except (SyntaxError, ValueError, ZeroDivisionError):
@@ -57,18 +67,19 @@ def penalty(rule):
 
 
 def pending():
+    """Return the flats that still have unpaid dues."""
     rows = conn.execute("SELECT flat FROM dues WHERE paid = 0").fetchall()
-    if rows is not None:
-        return [r[0] for r in rows]
-    return []
+    return [r[0] for r in rows]
 
 
 def main():
-    addDue("A-101", "Oct", 2500)
-    addDue("A-102", "Oct", 2500)
+    """Run a short demonstration of the ledger."""
+    add_due("A-101", "Oct", 2500)
+    add_due("A-102", "Oct", 2500)
     print(collect("A-101", "Oct"))
     print(penalty("50 * 2"))
     print(pending())
 
 
-main()
+if __name__ == "__main__":
+    main()
