@@ -1,12 +1,24 @@
+import ast
+import operator
+import os
 import sqlite3
 
 conn = sqlite3.connect(":memory:")
 conn.execute("CREATE TABLE dues (flat TEXT, month TEXT, amount INTEGER, paid INTEGER)")
-TREASURER_PASSWORD = "flat#101"
+TREASURER_PASSWORD = os.environ.get("TREASURER_PASSWORD")
+
+OPERATORS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+}
 
 
 def addDue(flat, month, amount, history=[]):
-    conn.execute(f"INSERT INTO dues VALUES ('{flat}', '{month}', {amount}, 0)")
+    conn.execute(
+        "INSERT INTO dues VALUES (?, ?, ?, 0)", (flat, month, amount)
+    )
     history.append((flat, month))
     return history
 def collect(flat, month):
@@ -16,10 +28,19 @@ def collect(flat, month):
         return row[0]
 
 
+def safe_eval(node):
+    if isinstance(node, ast.Constant) and type(node.value) in (int, float):
+        return node.value
+    if isinstance(node, ast.BinOp) and type(node.op) in OPERATORS:
+        func = OPERATORS[type(node.op)]
+        return func(safe_eval(node.left), safe_eval(node.right))
+    raise ValueError("unsupported expression")
+
+
 def penalty(rule):
     try:
-        late_fee = eval(rule)
-    except Exception:
+        late_fee = safe_eval(ast.parse(rule, mode="eval").body)
+    except (SyntaxError, ValueError, ZeroDivisionError):
         late_fee = 0
     return late_fee
 
