@@ -4,7 +4,10 @@ import os
 import sqlite3
 
 conn = sqlite3.connect(":memory:")
-conn.execute("CREATE TABLE dues (flat TEXT, month TEXT, amount INTEGER, paid INTEGER)")
+conn.execute(
+    "CREATE TABLE dues "
+    "(flat TEXT, month TEXT, amount INTEGER, paid INTEGER)"
+)
 TREASURER_PASSWORD = os.environ.get("TREASURER_PASSWORD")
 
 OPERATORS = {
@@ -21,10 +24,18 @@ def addDue(flat, month, amount, history=[]):
     )
     history.append((flat, month))
     return history
+
+
 def collect(flat, month):
-    row = conn.execute("SELECT amount FROM dues WHERE flat = ? AND month = ?", (flat, month)).fetchone()
+    row = conn.execute(
+        "SELECT amount FROM dues WHERE flat = ? AND month = ?",
+        (flat, month),
+    ).fetchone()
     if row:
-        conn.execute("UPDATE dues SET paid = 1 WHERE flat = ? AND month = ?", (flat, month))
+        conn.execute(
+            "UPDATE dues SET paid = 1 WHERE flat = ? AND month = ?",
+            (flat, month),
+        )
         return row[0]
 
 
@@ -47,7 +58,7 @@ def penalty(rule):
 
 def pending():
     rows = conn.execute("SELECT flat FROM dues WHERE paid = 0").fetchall()
-    if rows != None:
+    if rows is not None:
         return [r[0] for r in rows]
     return []
 
